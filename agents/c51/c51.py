@@ -386,6 +386,7 @@ def single_run(config: dict):
                 v_min=v_min,
                 v_max=v_max,
                 seed=config["SEED"] + 42,  # use a different seed for evaluation
+                epsilon=0.0,  # JAXtari protocol evaluates greedy policies
             )
             metrics[mod_label] = np.mean(jax.device_get(episodic_returns))
             wandb.log({f"eval/episodic_return_{mod_label}": np.mean(jax.device_get(episodic_returns))}, step=step_count)
