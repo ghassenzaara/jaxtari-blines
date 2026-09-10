@@ -27,7 +27,16 @@ def main(config):
         used_seed = starting_seed + seed
         print(f"Running seed {used_seed} ...")
         merged_config["SEED"] = used_seed
-        metrics = run_fn(merged_config)
+        try:
+            metrics = run_fn(merged_config)
+        except Exception as e:
+            # One seed failing must not take the remaining seeds down with it.
+            print(f"[ERROR] seed {used_seed} failed: {type(e).__name__}: {e}")
+            import traceback, wandb
+            traceback.print_exc()
+            if wandb.run is not None:
+                wandb.finish(exit_code=1)
+            continue
         metrics["ALG"] = merged_config["ALG"]
         metrics["ENV_ID"] = merged_config["ENV_ID"]
         metrics["PIXEL_BASED"] = merged_config.get("PIXEL_BASED", False)

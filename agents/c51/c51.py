@@ -392,19 +392,31 @@ def single_run(config: dict):
             wandb.log({f"eval/episodic_return_{mod_label}": np.mean(jax.device_get(episodic_returns))}, step=step_count)
 
             if config["CAPTURE_VIDEO"]:
-                # Instantiate a clean renderer immune to the training env's downscaling
-                clean_renderer = jaxatari.make(config["ENV_ID"], mods=mods_cfg).renderer
-                frames = jax.vmap(clean_renderer.render)(env_states)
-                # shape: (N, H, W, C) -> (N, C, H, W)
-                frames = jnp.transpose(frames, (0, 3, 1, 2))
-                video = wandb.Video(np.array(frames), fps=30, format="mp4")
-                wandb.log(
-                    {
-                        f"eval/video_{mod_label}": video,
-                    },
-                    step=step_count,
-                )
-                print(f"Video (eval) logged to wandb with {frames.shape[0]} frames ({mod_label}).")
+                # Long-episode games (enduro, breakout) return tens of thousands of
+                # states here. Rendering them all at full resolution on the GPU OOMs
+                # against the replay buffer, so cap the length and build the clip on
+                # the host. A failed video must never lose the run's eval metrics.
+                try:
+                    max_frames = config.get("VIDEO_MAX_FRAMES", 1800)
+                    clipped_states = jax.tree_util.tree_map(lambda x: x[:max_frames], env_states)
+                    cpu = jax.devices("cpu")[0]
+                    with jax.default_device(cpu):
+                        clipped_states = jax.device_put(clipped_states, cpu)
+                        # Instantiate a clean renderer immune to the training env's downscaling
+                        clean_renderer = jaxatari.make(config["ENV_ID"], mods=mods_cfg).renderer
+                        frames = jax.vmap(clean_renderer.render)(clipped_states)
+                        # shape: (N, H, W, C) -> (N, C, H, W)
+                        frames = jnp.transpose(frames, (0, 3, 1, 2))
+                    video = wandb.Video(np.array(frames), fps=30, format="mp4")
+                    wandb.log(
+                        {
+                            f"eval/video_{mod_label}": video,
+                        },
+                        step=step_count,
+                    )
+                    print(f"Video (eval) logged to wandb with {frames.shape[0]} frames ({mod_label}).")
+                except Exception as e:
+                    print(f"[WARNING] video capture skipped for {mod_label}: {type(e).__name__}: {e}")
         return metrics
 
     # we step n_envs each iteration
