@@ -19,6 +19,7 @@ def evaluate(
     v_max: float = 10.0,
     epsilon: float = 0.05,
     seed: int = 1,
+    max_eval_steps: int = 27000,
 ):
 
     env: JaxEnvironment | JaxatariWrapper = make_env(env_id)()
@@ -91,7 +92,12 @@ def evaluate(
         )
         return carry, (first_states_chunk, dones_chunk, rewards_chunk, actions_chunk)
 
-    while not jnp.all(done_ever):
+    # A greedy policy can stall forever (e.g. standing still in montezumarevenge),
+    # so truncate like ALE does: 27k agent steps == 108k frames == 30 min of play.
+    # Unfinished episodes keep the return collected up to the cap.
+    steps_run = 0
+    while not jnp.all(done_ever) and steps_run < max_eval_steps:
+        steps_run += 1000
         carry, (first_states_chunk, dones_chunk, rewards_chunk, actions_chunk) = scanned_step(carry)
         all_first_states.append(first_states_chunk)
         all_dones.append(dones_chunk)

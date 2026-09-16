@@ -57,8 +57,8 @@ ENVS: list[str] = [
 ]
 
 CONFIGS: list[str] = [
-    "c51_rgb_tuned",
-    # "c51_oc_tuned",
+    # "c51_rgb_tuned",
+    "c51_oc_tuned",
     # "dqn_rgb_tuned",
     # "dqn_oc_tuned",
     # "rainbow_rgb_tuned",
