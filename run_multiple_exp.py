@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_all_dqn.py — Distribute DQN experiments across GPUs evenly.
+run_multiple_exp.py — Distribute experiments across GPUs evenly.
 
 Every (env, config) pair is run in sequence by worker threads, one per GPU.
 When a GPU finishes its current experiment, it grabs the next from the queue.
@@ -16,9 +16,9 @@ invocations of this script started at the exact same instant can still both
 pick the same free GPU (there is no cross-process locking).
 
 Usage:
-    uv run python run_all_dqn.py --gpus 0 1 2 3
-    uv run python run_all_dqn.py --gpus 0,1,2,3
-    uv run python run_all_dqn.py --gpus 0 1          # only two GPUs
+    uv run python run_multiple_exp.py --gpus 0 1 2 3
+    uv run python run_multiple_exp.py --gpus 0,1,2,3
+    uv run python run_multiple_exp.py --gpus 0 1          # only two GPUs
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from queue import Queue
+from queue import Empty, Queue
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Configure your experiment grid below
@@ -284,7 +284,7 @@ def _parse_gpus(raw: Sequence[str]) -> list[int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Distribute DQN experiments across GPUs evenly."
+        description="Distribute experiments across GPUs evenly."
     )
     parser.add_argument(
         "--gpus",
@@ -321,7 +321,7 @@ def main() -> None:
     print()
 
     # -- shared work queue ----------------------------------------------------
-    queue: Queue[Experiment | None] = Queue()
+    queue: Queue[Experiment] = Queue()
     for exp in experiments:
         queue.put(exp)
 
@@ -334,7 +334,7 @@ def main() -> None:
         while True:
             try:
                 exp = queue.get_nowait()
-            except Exception:
+            except Empty:
                 return  # no more work
             try:
                 gpu_id = acquire_free_gpu(gpu_ids, in_use, guard)
