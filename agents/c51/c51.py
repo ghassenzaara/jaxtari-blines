@@ -111,11 +111,10 @@ class C51MLPNetwork(nn.Module):
         x = x.reshape((x.shape[0], self.action_dim, self.n_atoms))
         return nn.softmax(x, axis=-1)
 
-#params + optimizer state + target_params
+
 class C51TrainState(TrainState):
     target_params: flax.core.FrozenDict
 
-# One transition, stored in the buffer
 
 @flax.struct.dataclass
 class TimeStep:
@@ -123,7 +122,6 @@ class TimeStep:
     action: jnp.array
     reward: jnp.array
     done: jnp.array
-    
 
 
 def single_run(config: dict):
